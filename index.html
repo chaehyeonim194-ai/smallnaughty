@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#172554">
+<title>잔여동기와 후속 동기 증폭 연구</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#182238;--muted:#65718a;--line:#e1e6f0;--blue:#3457d5;--blue2:#eaf0ff;--red:#b42318;--green:#16794b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;padding:22px 14px;line-height:1.65}
+main{max-width:850px;margin:auto}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:clamp(20px,4vw,34px);box-shadow:0 8px 30px #1822380c}
+h1,h2,h3{line-height:1.3}h1{font-size:clamp(22px,4vw,29px);text-align:center;margin:4px 0 18px}h2{font-size:21px;margin:0 0 16px}h3{font-size:16px;margin:22px 0 8px}
+p{margin:10px 0}.muted,.hint{color:var(--muted);font-size:13px}.center{text-align:center}
+.progress{height:6px;background:#edf0f6;border-radius:20px;margin-bottom:25px;overflow:hidden}.bar{height:100%;width:0;background:var(--blue);transition:width .2s}
+.hidden{display:none!important}.primary,.secondary,.danger{border:0;border-radius:10px;padding:13px 18px;font-size:15px;font-weight:650;cursor:pointer}
+.primary{background:var(--blue);color:white;width:100%;margin-top:15px}.secondary{background:var(--blue2);color:#2443aa}.danger{background:#fff0ee;color:var(--red)}
+button:disabled{opacity:.55;cursor:not-allowed}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #aabaff;outline-offset:2px}
+.choice{display:block;width:100%;padding:16px;text-align:left;background:white;border:1px solid var(--line);border-radius:12px;margin:10px 0;cursor:pointer;color:var(--ink)}
+.choice:hover{border-color:var(--blue);background:#fafbff}.choice strong{display:block;font-size:16px}
+.field{margin:17px 0}.field label{display:block;font-weight:650;margin-bottom:7px}.field input[type=text],.field input[type=email],.field input[type=password],.field textarea,.field select{width:100%;padding:12px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+.scale{display:flex;gap:8px;flex-wrap:wrap}.scale label{flex:1;min-width:48px;text-align:center;border:1px solid var(--line);border-radius:9px;padding:9px 4px;font-weight:500;cursor:pointer}.scale input{display:block;margin:0 auto 5px}
+.notice{padding:13px 15px;background:#f0f4ff;border-radius:10px;font-size:14px}.status{min-height:22px;color:var(--muted);font-size:13px;margin-top:10px}.error{color:var(--red)}.success{color:var(--green)}
+.taskbox{background:#f8f9fc;border:1px solid var(--line);border-radius:12px;padding:17px;margin:14px 0}.taskbox p{margin:5px 0}
+.admin-top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:14px}
+table{border-collapse:collapse;min-width:1100px;width:100%;font-size:12px}th,td{padding:9px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:center}th{background:#f2f5fb;position:sticky;top:0}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:15px 0}.metric{background:#f4f6fb;padding:13px;border-radius:10px}.metric b{display:block;font-size:22px}
+.footer{text-align:center;color:var(--muted);font-size:11px;margin:18px}
+@media(max-width:520px){body{padding:12px 8px}.scale{gap:4px}.scale label{min-width:38px;font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<section class="card">
+<div class="progress"><div class="bar" id="progress"></div></div>
+
+<section id="screen-consent">
+<h1>연구 참여 안내 및 동의</h1>
+<p>본 연구는 선택 이후에도 남아 있는 목표 관련 동기와 이후 행동 및 동기 변화의 관계를 살펴봅니다. 참여는 자발적이며, 원하지 않으면 언제든 창을 닫아 중단할 수 있습니다.</p>
+<div class="notice"><b>참여 전 확인</b><br>예상 소요 시간은 약 8~12분입니다. 본 실험은 심리적 불편을 유발할 수 있는 내용이 거의 없으나, 불편하면 언제든 중단할 수 있습니다. 응답은 연구 목적으로 분석됩니다.</div>
+<div class="field"><label><input type="checkbox" id="consent"> 연구 목적, 절차, 자발적 참여 및 중단 가능성에 관한 안내를 읽었으며 참여에 동의합니다.</label></div>
+<div class="field"><label for="ageCheck">연령 확인</label><select id="ageCheck"><option value="">선택해 주세요</option><option value="adult">만 19세 이상</option><option value="minor">만 19세 미만</option></select><p class="hint">미성년자 참여를 포함하려면 보호자 동의 등 별도 윤리 절차를 먼저 마련해야 합니다.</p></div>
+<button class="primary" id="beginConsent">동의하고 시작</button>
+<div class="status" id="consentStatus" role="status"></div>
+</section>
+
+<section id="screen-baseline" class="hidden">
+<h2>1. 사전 목표 선호 및 동기</h2>
+<p>아래 두 활동을 각각 생각해 보세요. 현재 자신에게 얼마나 매력적이고 중요한지 응답해 주세요.</p>
+<div id="baselineQuestions"></div>
+<button class="primary" id="baselineNext">다음</button>
+<div class="status" id="baselineStatus"></div>
+</section>
+
+<section id="screen-allocation" class="hidden">
+<h2>2. 목표와 과제 안내</h2>
+<p id="allocationIntro"></p>
+<div class="taskbox" id="assignedTask"></div>
+<p class="hint">배정은 사전 응답을 바탕으로 자동 결정됩니다. 어느 조건에 배정되었는지는 실험 종료 후 연구자가 확인할 수 있습니다.</p>
+<button class="primary" id="allocationNext">과제 시작</button>
+</section>
+
+<section id="screen-task" class="hidden">
+<h2>3. 최초 과제 수행</h2>
+<p id="taskInstruction"></p>
+<div class="taskbox">
+<p><b>간단한 아이디어 생성 과제</b></p>
+<p id="taskPrompt"></p>
+<div class="field"><label for="taskResponse">떠오르는 아이디어를 간단히 작성해 주세요.</label><textarea id="taskResponse" rows="4" maxlength="1200" placeholder="자유롭게 작성해 주세요."></textarea></div>
+</div>
+<button class="primary" id="taskSubmit">응답 제출</button>
+<div class="status" id="taskStatus"></div>
+</section>
+
+<section id="screen-residual" class="hidden">
+<h2>4. 현재 남아 있는 동기</h2>
+<p>방금 과제를 마친 지금, 두 활동에 대해 느끼는 상태를 각각 응답해 주세요. 정답은 없습니다.</p>
+<div id="residualQuestions"></div>
+<button class="primary" id="residualNext">다음</button>
+<div class="status" id="residualStatus"></div>
+</section>
+
+<section id="screen-reentry" class="hidden">
+<h2>5. 후속 과제 선택</h2>
+<p>이제 추가 활동을 선택할 수 있습니다. 수행하지 않아도 불이익은 없습니다. 원하는 활동과 투자할 노력을 선택해 주세요.</p>
+<div class="field"><label for="reentryGoal">다시 수행할 활동</label><select id="reentryGoal"><option value="">선택해 주세요</option><option value="creative">흥미 중심 활동</option><option value="reward">보상 중심 활동</option><option value="none">추가 활동을 하지 않음</option></select></div>
+<div class="field"><label for="effortChoice">투자할 노력 수준</label><select id="effortChoice"><option value="">선택해 주세요</option><option value="0">0 - 수행하지 않음</option><option value="1">1 - 짧게 수행</option><option value="2">2 - 보통 수행</option><option value="3">3 - 충분히 수행</option></select></div>
+<button class="primary" id="reentryNext">선택 확정</button>
+<div class="status" id="reentryStatus"></div>
+</section>
+
+<section id="screen-feedback" class="hidden">
+<h2>6. 과제 결과 정보</h2>
+<p id="feedbackText"></p>
+<div class="taskbox"><b id="feedbackTitle"></b><p id="feedbackDetail"></p></div>
+<button class="primary" id="feedbackNext">다음</button>
+</section>
+
+<section id="screen-followup" class="hidden">
+<h2>7. 후속 동기 및 추가 선택</h2>
+<p>현재 두 활동에 대한 동기와 추가 참여 의향을 응답해 주세요.</p>
+<div id="followupQuestions"></div>
+<div class="field"><label for="followupChoice">추가로 수행할 활동</label><select id="followupChoice"><option value="">선택해 주세요</option><option value="creative">흥미 중심 활동</option><option value="reward">보상 중심 활동</option><option value="none">추가 활동을 하지 않음</option></select></div>
+<div class="field"><label for="followupEffort">추가 노력 수준</label><select id="followupEffort"><option value="">선택해 주세요</option><option value="0">0 - 수행하지 않음</option><option value="1">1 - 짧게 수행</option><option value="2">2 - 보통 수행</option><option value="3">3 - 충분히 수행</option></select></div>
+<button class="primary" id="followupSubmit">실험 완료</button>
+<div class="status" id="followupStatus"></div>
+</section>
+
+<section id="screen-done" class="hidden">
+<h1>참여가 완료되었습니다.</h1>
+<p class="center">참여해 주셔서 감사합니다.</p>
+<p class="center muted">응답 저장 상태를 아래에서 확인할 수 있습니다.</p>
+<div class="status center" id="saveStatus" role="status"></div>
+<p class="hint">참여자 화면에는 개인의 조건이나 연구 가설에 대한 해석이 표시되지 않습니다.</p>
+</section>
+
+<section id="screen-admin" class="hidden">
+<h1>연구자 대시보드</h1>
+<div id="adminLogin">
+<p>관리자 계정으로 로그인해야 응답 데이터를 볼 수 있습니다.</p>
+<div class="field"><label for="adminEmail">관리자 이메일</label><input id="adminEmail" type="email" autocomplete="username"></div>
+<div class="field"><label for="adminPassword">비밀번호</label><input id="adminPassword" type="password" autocomplete="current-password"></div>
+<button class="primary" id="adminLoginBtn">로그인</button>
+<div class="status" id="adminLoginStatus"></div>
+</div>
+<div id="adminContent" class="hidden">
+<div class="admin-top"><b>응답 현황 (실시간 구독)</b><button class="secondary" id="adminLogout">로그아웃</button></div>
+<div class="metrics">
+<div class="metric">전체 완료 응답<b id="totalCount">0</b></div>
+<div class="metric">잔여동기 높음 조건<b id="highCount">0</b></div>
+<div class="metric">잔여동기 낮음 조건<b id="lowCount">0</b></div>
+<div class="metric">마지막 갱신<b id="lastUpdated" style="font-size:13px">-</b></div>
+</div>
+<p class="hint">표의 각 행은 완료된 참여자 1명입니다. 원자료와 조건 배정은 연구 분석 전 데이터 품질 점검이 필요합니다.</p>
+<div class="admin-top"><button class="secondary" id="refreshBtn">새로고침</button><button class="secondary" id="exportBtn">CSV(Excel) 다운로드</button></div>
+<div class="table-wrap"><table><thead><tr>
+<th>참여자 ID</th><th>완료 시각</th><th>잔여동기 조작</th><th>피드백 조건</th><th>선호 목표</th><th>배정 목표</th>
+<th>사전 흥미동기</th><th>사전 보상동기</th><th>잔여 흥미동기</th><th>잔여 보상동기</th><th>과제 RT(ms)</th><th>잔여측정 RT(ms)</th>
+<th>재개입 목표</th><th>노력</th><th>후속 동기</th><th>후속選択</th><th>후속 노력</th><th>총 소요(ms)</th>
+</tr></thead><tbody id="adminRows"></tbody></table></div>
+<div class="status" id="adminDataStatus"></div>
+</div>
+</section>
+</section>
+<p class="footer">연구용 프로토타입 · 배포 전 연구윤리 심의 및 파일럿 테스트 필요</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+/*
+ * 1) 아래 두 값을 Supabase 프로젝트의 Project URL / anon public key로 바꾸세요.
+ *    anon key는 브라우저에 노출되는 공개 키이며, 보안은 SQL RLS 정책으로 통제합니다.
+ */
+const SUPABASE_URL = "https://lkelkierznanbheasxka.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "sb_publishable_m2qCTDw-rkU-_dvJyd4Fbg_k8fb_rAm";
+const TABLE = "study_responses";
+const ADMIN_MODE = new URLSearchParams(location.search).get("admin") === "sure";
+const supabaseReady = SUPABASE_URL.startsWith("https://") &&
+  !SUPABASE_URL.includes("YOUR_") && !SUPABASE_ANON_KEY.includes("YOUR_") &&
+  window.supabase;
+const db = supabaseReady ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+}) : null;
+
+const $ = id => document.getElementById(id);
+const screens = ["consent","baseline","allocation","task","residual","reentry","feedback","followup","done","admin"];
+let screen = "consent";
+let participant = {
+  participant_id: crypto.randomUUID ? crypto.randomUUID() : "p-"+Date.now()+"-"+Math.random().toString(36).slice(2),
+  started_at:new Date().toISOString(), completed_at:null,
+  residual_condition:null, feedback_condition:null, preferred_goal:null, assigned_goal:null,
+  baseline_creative:null, baseline_reward:null,
+  residual_creative:null, residual_reward:null,
+  initial_task_text:null, reentry_goal:null, reentry_effort:null,
+  followup_motivation_creative:null, followup_motivation_reward:null,
+  followup_goal:null, followup_effort:null,
+  t_baseline_ms:null,t_task_ms:null,t_residual_ms:null,t_reentry_ms:null,t_followup_ms:null,
+  consent_version:"1.0", user_agent:navigator.userAgent
+};
+let stageStart=0, submitted=false, adminChannel=null, adminRowsCache=[];
+
+function show(name){
+  screens.forEach(s=>$("screen-"+s).classList.add("hidden"));
+  $("screen-"+name).classList.remove("hidden"); screen=name;
+  const index=screens.indexOf(name);
+  $("progress").style.width=(Math.min(index,8)/8*100)+"%";
+}
+function elapsed(){return Math.max(0,Math.round(performance.now()-stageStart));}
+function setStatus(id,msg,type=""){const el=$(id);el.textContent=msg;el.className="status "+type;}
+function radioScale(containerId, name, title, low, high){
+  const box=$(containerId), wrap=document.createElement("div");wrap.className="field";
+  const label=document.createElement("label");label.textContent=title;wrap.appendChild(label);
+  const scale=document.createElement("div");scale.className="scale";
+  for(let n=1;n<=7;n++){
+    const l=document.createElement("label"),i=document.createElement("input");
+    i.type="radio";i.name=name;i.value=String(n);i.required=true;
+    l.append(i,document.createTextNode(String(n)));scale.appendChild(l);
+  }
+  const hint=document.createElement("p");hint.className="hint";hint.textContent="1 = "+low+" / 7 = "+high;
+  wrap.append(scale,hint);box.appendChild(wrap);
+}
+function selected(name){const v=document.querySelector('input[name="'+name+'"]:checked');return v?Number(v.value):null;}
+function makeBaseline(){
+  $("baselineQuestions").replaceChildren();
+  radioScale("baselineQuestions","base_creative","흥미 중심 활동에 대한 현재 관심과 의욕","전혀 그렇지 않다","매우 그렇다");
+  radioScale("baselineQuestions","base_reward","보상 중심 활동에 대한 현재 관심과 의욕","전혀 그렇지 않다","매우 그렇다");
+}
+function makeResidual(){
+  $("residualQuestions").replaceChildren();
+  radioScale("residualQuestions","res_creative","흥미 중심 활동을 다시 추구하고 싶은 마음이 남아 있다","전혀 그렇지 않다","매우 그렇다");
+  radioScale("residualQuestions","res_reward","보상 중심 활동을 다시 추구하고 싶은 마음이 남아 있다","전혀 그렇지 않다","매우 그렇다");
+}
+function makeFollowup(){
+  $("followupQuestions").replaceChildren();
+  radioScale("followupQuestions","follow_creative","현재 흥미 중심 활동을 추구하려는 동기","전혀 없다","매우 강하다");
+  radioScale("followupQuestions","follow_reward","현재 보상 중심 활동을 추구하려는 동기","전혀 없다","매우 강하다");
+}
+function chooseCondition(){
+  const c=participant.baseline_creative, r=participant.baseline_reward;
+  participant.preferred_goal = c===r ? (Math.random()<.5?"creative":"reward") : (c>r?"creative":"reward");
+  const mismatch=Math.random()<.5;
+  participant.residual_condition=mismatch?"residual_high":"residual_low";
+  participant.feedback_condition=Math.random()<.5?"progress":"neutral";
+  participant.assigned_goal=mismatch?(participant.preferred_goal==="creative"?"reward":"creative"):participant.preferred_goal;
+  $("allocationIntro").textContent="다음 활동 중 하나가 배정되었습니다. 아래 과제를 수행해 주세요.";
+  $("assignedTask").textContent=participant.assigned_goal==="creative"?"배정 활동: 흥미 중심 활동":"배정 활동: 보상 중심 활동";
+  $("taskInstruction").textContent="배정된 활동과 관련된 짧은 아이디어 생성 과제입니다. 정해진 정답은 없습니다.";
+  $("taskPrompt").textContent=participant.assigned_goal==="creative"?
+    "일상에서 더 흥미롭고 즐거운 여가 활동을 만들 방법을 가능한 한 구체적으로 적어 주세요.":
+    "제한된 시간 안에 작업 효율을 높이거나 보상을 얻을 수 있는 방법을 가능한 한 구체적으로 적어 주세요.";
+}
+function validateConfig(){
+  if(!db){alert("Supabase 설정이 아직 완료되지 않았습니다. index.html의 SUPABASE_URL과 SUPABASE_ANON_KEY를 설정하고 SQL을 실행한 뒤 배포해 주세요.");return false;}
+  return true;
+}
+
+$("beginConsent").addEventListener("click",()=>{
+  if(!$("consent").checked){setStatus("consentStatus","참여 동의 확인란을 체크해 주세요.","error");return;}
+  if($("ageCheck").value!=="adult"){setStatus("consentStatus","이 프로토타입은 만 19세 이상 참여자를 대상으로 합니다.","error");return;}
+  if(!validateConfig())return;
+  makeBaseline();show("baseline");stageStart=performance.now();
+});
+$("baselineNext").addEventListener("click",()=>{
+  const c=selected("base_creative"),r=selected("base_reward");
+  if(!c||!r){setStatus("baselineStatus","두 문항에 모두 응답해 주세요.","error");return;}
+  participant.baseline_creative=c;participant.baseline_reward=r;participant.t_baseline_ms=elapsed();
+  chooseCondition();show("allocation");
+});
+$("allocationNext").addEventListener("click",()=>{show("task");stageStart=performance.now();});
+$("taskSubmit").addEventListener("click",()=>{
+  const value=$("taskResponse").value.trim();
+  if(value.length<5){setStatus("taskStatus","과제 응답을 5자 이상 작성해 주세요.","error");return;}
+  participant.initial_task_text=value;participant.t_task_ms=elapsed();
+  makeResidual();show("residual");stageStart=performance.now();
+});
+$("residualNext").addEventListener("click",()=>{
+  const c=selected("res_creative"),r=selected("res_reward");
+  if(!c||!r){setStatus("residualStatus","두 문항에 모두 응답해 주세요.","error");return;}
+  participant.residual_creative=c;participant.residual_reward=r;participant.t_residual_ms=elapsed();
+  show("reentry");stageStart=performance.now();
+});
+$("reentryNext").addEventListener("click",()=>{
+  const g=$("reentryGoal").value,e=$("effortChoice").value;
+  if(!g||e===""){setStatus("reentryStatus","활동과 노력 수준을 모두 선택해 주세요.","error");return;}
+  participant.reentry_goal=g;participant.reentry_effort=Number(e);participant.t_reentry_ms=elapsed();
+  const feedback=participant.feedback_condition==="progress";
+  $("feedbackTitle").textContent=feedback?"진행 정보":"중립 정보";
+  $("feedbackText").textContent=feedback?
+    "방금 선택한 활동에 관한 진행 정보를 확인해 주세요.":
+    "다음은 과제 절차에 관한 안내입니다.";
+  $("feedbackDetail").textContent=feedback?
+    "진행 정보 조건입니다. 방금 선택한 노력 수준("+participant.reentry_effort+"/3)이 목표 수행 과정에 기록되었습니다.":
+    "중립 정보 조건입니다. 응답이 정상적으로 기록되었습니다. 다음 단계에서 현재 상태를 다시 응답해 주세요.";
+  show("feedback");
+});
+$("feedbackNext").addEventListener("click",()=>{makeFollowup();show("followup");stageStart=performance.now();});
+$("followupSubmit").addEventListener("click",async()=>{
+  if(submitted)return;
+  const c=selected("follow_creative"),r=selected("follow_reward"),g=$("followupChoice").value,e=$("followupEffort").value;
+  if(!c||!r||!g||e===""){setStatus("followupStatus","모든 문항에 응답해 주세요.","error");return;}
+  submitted=true;$("followupSubmit").disabled=true;
+  participant.followup_motivation_creative=c;participant.followup_motivation_reward=r;
+  participant.followup_goal=g;participant.followup_effort=Number(e);participant.t_followup_ms=elapsed();
+  participant.completed_at=new Date().toISOString();
+  const payload={...participant};
+  const {error}=await db.from(TABLE).insert(payload);
+  show("done");
+  if(error){
+    console.error(error);
+    setStatus("saveStatus","서버 저장에 실패했습니다. 인터넷 연결을 확인하고 연구자에게 문의해 주세요. 오류: "+error.message,"error");
+    submitted=false;$("followupSubmit").disabled=false;
+  }else{
+    setStatus("saveStatus","응답이 중앙 데이터베이스에 저장되었습니다.","success");
+  }
+});
+
+/* Admin mode: ?admin=sure; actual data access is protected by Supabase Auth + RLS. */
+if(ADMIN_MODE){show("admin");$("progress").style.width="100%";}
+$("adminLoginBtn").addEventListener("click",async()=>{
+  if(!db){setStatus("adminLoginStatus","Supabase 설정이 필요합니다.","error");return;}
+  const email=$("adminEmail").value.trim(),password=$("adminPassword").value;
+  if(!email||!password){setStatus("adminLoginStatus","이메일과 비밀번호를 입력해 주세요.","error");return;}
+  const {error}=await db.auth.signInWithPassword({email,password});
+  if(error){setStatus("adminLoginStatus","로그인 실패: "+error.message,"error");return;}
+  await showAdmin();
+});
+async function showAdmin(){
+  const {data:{session}}=await db.auth.getSession();
+  if(!session){$("adminLogin").classList.remove("hidden");$("adminContent").classList.add("hidden");return;}
+  $("adminLogin").classList.add("hidden");$("adminContent").classList.remove("hidden");
+  await loadAdminRows();
+  if(adminChannel)await db.removeChannel(adminChannel);
+  adminChannel=db.channel("study-responses-live")
+    .on("postgres_changes",{event:"*",schema:"public",table:TABLE},()=>loadAdminRows())
+    .subscribe();
+}
+async function loadAdminRows(){
+  const {data,error}=await db.from(TABLE).select("*").order("completed_at",{ascending:false}).limit(5000);
+  if(error){setStatus("adminDataStatus","조회 실패: "+error.message,"error");return;}
+  adminRowsCache=data||[];
+  $("totalCount").textContent=adminRowsCache.length;
+  $("highCount").textContent=adminRowsCache.filter(x=>x.residual_condition==="residual_high").length;
+  $("lowCount").textContent=adminRowsCache.filter(x=>x.residual_condition==="residual_low").length;
+  $("lastUpdated").textContent=new Date().toLocaleTimeString("ko-KR");
+  const body=$("adminRows");body.replaceChildren();
+  for(const x of adminRowsCache){
+    const vals=[x.participant_id,x.completed_at,x.residual_condition,x.feedback_condition,x.preferred_goal,x.assigned_goal,
+      x.baseline_creative,x.baseline_reward,x.residual_creative,x.residual_reward,
+      x.t_task_ms,x.t_residual_ms,x.reentry_goal,x.reentry_effort,
+      x.followup_motivation_creative+"/"+x.followup_motivation_reward,
+      x.followup_goal,x.followup_effort,
+      [x.t_baseline_ms,x.t_task_ms,x.t_residual_ms,x.t_reentry_ms,x.t_followup_ms].reduce((a,b)=>a+(Number(b)||0),0)];
+    const tr=document.createElement("tr");
+    vals.forEach(v=>{const td=document.createElement("td");td.textContent=v==null?"":String(v);tr.appendChild(td);});
+    body.appendChild(tr);
+  }
+  setStatus("adminDataStatus","완료 응답 "+adminRowsCache.length+"건을 표시하고 있습니다.");
+}
+$("refreshBtn").addEventListener("click",loadAdminRows);
+$("adminLogout").addEventListener("click",async()=>{
+  if(adminChannel){await db.removeChannel(adminChannel);adminChannel=null;}
+  await db.auth.signOut();$("adminContent").classList.add("hidden");$("adminLogin").classList.remove("hidden");
+});
+$("exportBtn").addEventListener("click",()=>{
+  if(!adminRowsCache.length){setStatus("adminDataStatus","내보낼 데이터가 없습니다.");return;}
+  const cols=Object.keys(adminRowsCache[0]);
+  const esc=v=>{let s=String(v??"");if(/^[\s]*[=+\-@]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+  const csv=[cols.map(esc).join(","),...adminRowsCache.map(row=>cols.map(k=>esc(row[k])).join(","))].join("\r\n");
+  const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="residual_motivation_data_"+new Date().toISOString().slice(0,10)+".csv";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+if(ADMIN_MODE&&db){db.auth.getSession().then(({data})=>{if(data.session)showAdmin();});}
+</script>
+</body>
+</html>
